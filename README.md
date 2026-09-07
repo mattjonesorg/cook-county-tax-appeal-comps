@@ -85,6 +85,36 @@ with `--out-dir`). For PIN `16-07-204-019-0000` that's:
 `output/` contains real property data and is gitignored -- it's never
 committed to this repo.
 
+## Filing your appeal
+
+Once you have the output files, file at
+[propertytaxfilings.cookcountyil.gov](https://propertytaxfilings.cookcountyil.gov/Filing/FilingType/Info/CCAO_APPEAL_RES_2026)
+(the URL's `_RES_2026` suffix is tax-year-specific -- if you're filing in a
+different year, start from the Assessor's site and look for the current
+year's residential appeal filing). The filer is a multi-tab Tyler
+Technologies form; here's what each tab needs and where it comes from:
+
+1. **Activity Window / Verify Parcel / Primary PIN / Additional PINs /
+   Filer / Property Characteristics** -- your own account, contact, and
+   parcel-verification info. Nothing from this tool is needed here; just
+   confirm the property details the county already has on file match
+   reality (correct this first if they don't -- a "Property Description
+   Error" is a different appeal basis than uniformity).
+2. **Appeal Application** -- use `*-appeal-form-answers.txt` directly:
+   Desired Market Value, which "Reason(s) for Appeal" checkboxes to check,
+   and the short text for each "Explain ..." box (that box is capped at 40
+   characters -- paste it exactly, don't try to add more).
+3. **Comparables Select** -- click "Find Comparables" with the default
+   criteria, then check the boxes for the PINs listed in the "Comparables
+   Select tab" section of `*-appeal-form-answers.txt` (already in priority
+   order) and click "Add Selected Parcel(s)."
+4. **Comparables** -- just review; the county's own numbers here should
+   match what this tool already computed. Nothing to enter.
+5. **Attachments** -- upload `*-appeal-narrative.pdf` as the "Appeal
+   Narrative" attachment, and `*-comparable-pins.txt` as the required
+   "Comparable Property PIN(s)" attachment.
+6. **Submit** -- review everything and file.
+
 ## Why this approach
 
 Cook County's residential appeals are won mainly on the **lack-of-uniformity**
