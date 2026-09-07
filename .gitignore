@@ -1,0 +1,10 @@
+# Generated appeal output (contains real property data)
+output/
+legacy/
+
+# Python
+__pycache__/
+*.pyc
+
+# Tooling artifacts
+.playwright-mcp/
