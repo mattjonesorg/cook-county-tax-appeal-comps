@@ -4,6 +4,9 @@ Find Cook County property tax appeal comparables for a given PIN, straight
 from the county's own ArcGIS and open-data APIs -- no manual CSV export from
 CookViewer required.
 
+Live in DuPage County instead? See the
+[DuPage County version](https://github.com/mattjonesorg/dupage-county-tax-appeal-comps).
+
 ## Quick start
 
 ```
