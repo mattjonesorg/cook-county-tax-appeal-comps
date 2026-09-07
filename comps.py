@@ -11,6 +11,7 @@ Usage:
 Writes results under output/<assessment year>/ by default.
 """
 import argparse
+import io
 import json
 import re
 import sys
@@ -18,6 +19,18 @@ from pathlib import Path
 
 import pandas as pd
 import requests
+from reportlab.lib.enums import TA_LEFT
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import Image as RLImage
+from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer
+
+GROUND_PHOTO_URL = "https://maps.cookcountyil.gov/groundphotos/{pin}"
+
+# Cook County's own online filer caps the "Comparable Property PIN(s)"
+# attachment at 6 PINs -- keep the photo/PDF evidence in step with that.
+MAX_COMPARABLE_PINS = 6
 
 MAPSERVER = "https://gis.cookcountyil.gov/traditional/rest/services/CookViewer3Parcels/MapServer/0/query"
 
@@ -278,6 +291,79 @@ def build_narrative(my_property: pd.Series, cheaper_comps: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
+def fetch_ground_photo(pin14: str) -> bytes | None:
+    """Cook County publishes a ground-level assessor field photo per PIN at
+    this URL (no auth, no API key) -- the same one linked from CookViewer's
+    property panel as "Historical Photo". Returns None if unavailable
+    (network error, or a response too small/wrong-typed to be a real photo)
+    rather than raising, since not every PIN necessarily has one on file."""
+    try:
+        resp = requests.get(GROUND_PHOTO_URL.format(pin=pin14), timeout=15)
+    except requests.RequestException:
+        return None
+    if not resp.ok:
+        return None
+    if not resp.headers.get("Content-Type", "").startswith("image/"):
+        return None
+    if len(resp.content) < 2000:
+        return None
+    return _compress_photo(resp.content)
+
+
+def _compress_photo(photo_bytes: bytes, max_width: int = 1000, quality: int = 75) -> bytes:
+    """The assessor's field photos come back at full camera resolution
+    (~1MB/photo, 2500px+ wide) -- with up to 7 embedded, that blows past the
+    online filer's 10MB attachment cap fast. Downscale/recompress for a PDF
+    exhibit, where print-quality detail isn't needed."""
+    try:
+        from PIL import Image
+        img = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
+        if img.width > max_width:
+            img = img.resize((max_width, round(img.height * max_width / img.width)))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        return buf.getvalue()
+    except Exception:
+        return photo_bytes
+
+
+def build_narrative_pdf(path: Path, pin_dash: str, narrative_text: str,
+                         photo_rows: list[tuple[str, bytes | None]]) -> None:
+    """The Appeal Narrative attachment: the same text as *-appeal-notes.txt,
+    plus one Cook County assessor field photo per cited property so the
+    narrative reads as a self-contained exhibit."""
+    styles = getSampleStyleSheet()
+    body_style = ParagraphStyle("Body", parent=styles["Normal"], fontSize=10, leading=14, spaceAfter=8)
+    caption_style = ParagraphStyle("Caption", parent=styles["Normal"], fontSize=9,
+                                    alignment=TA_LEFT, spaceAfter=18)
+
+    def escape(text: str) -> str:
+        return (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    .replace("\t", ": ").replace("\n", "<br/>"))
+
+    doc = SimpleDocTemplate(str(path), pagesize=letter, leftMargin=0.75 * inch,
+                             rightMargin=0.75 * inch, topMargin=0.75 * inch, bottomMargin=0.75 * inch)
+    story = [
+        Paragraph(f"Property Tax Appeal Narrative -- PIN {pin_dash}", styles["Heading1"]),
+        Spacer(1, 12),
+    ]
+    for para in narrative_text.split("\n\n"):
+        story.append(Paragraph(escape(para), body_style))
+
+    if photo_rows:
+        story.append(PageBreak())
+        story.append(Paragraph("Photos", styles["Heading1"]))
+        story.append(Spacer(1, 12))
+        for caption, photo_bytes in photo_rows:
+            if photo_bytes:
+                story.append(RLImage(io.BytesIO(photo_bytes), width=4 * inch, height=3 * inch))
+            else:
+                story.append(Paragraph("(photo unavailable)", caption_style))
+            story.append(Paragraph(escape(caption), caption_style))
+
+    doc.build(story)
+
+
 def cite_comps(df: pd.DataFrame, value_col: str, n: int = 3) -> str:
     cites = [
         f"{row['PIN14_dash']} ({row['street_address']}, ${row[value_col]:.2f}/sqft)"
@@ -457,6 +543,9 @@ def main():
                               "the suggested Desired Market Value. 50 = median (default, most "
                               "defensible); lower is a more aggressive ask but leans on fewer, "
                               "more extreme comps; 0 = the single lowest comp.")
+    parser.add_argument("--no-photos", action="store_true",
+                         help="Skip fetching Cook County assessor field photos for the narrative "
+                              "PDF (faster; the PDF still gets built, just text-only)")
     args = parser.parse_args()
     if not 0 <= args.target_percentile <= 100:
         parser.error("--target-percentile must be between 0 and 100")
@@ -522,6 +611,28 @@ def main():
     form_answers_path = out_dir / f"{pin_slug}-appeal-form-answers.txt"
     form_answers_path.write_text(form_answers + "\n")
 
+    photo_rows = []
+    if not args.no_photos:
+        print("Fetching property photos for the narrative PDF...")
+        subj = my_property.iloc[0]
+        photo_rows.append((
+            f"Subject property: {subj['PIN14_dash']} ({subj['street_address']}) -- "
+            f"${subj['building_value_per_square_foot']:.2f}/sqft",
+            fetch_ground_photo(subj["PIN14"]),
+        ))
+        for _, row in building_comps.head(MAX_COMPARABLE_PINS).iterrows():
+            tag = " [reduced on appeal]" if row.get("ever_reduced_at_bor") is True else ""
+            photo_rows.append((
+                f"{row['PIN14_dash']} ({row['street_address']}) -- "
+                f"${row['building_value_per_square_foot']:.2f}/sqft{tag}",
+                fetch_ground_photo(row["PIN14"]),
+            ))
+        n_found = sum(1 for _, photo in photo_rows if photo)
+        print(f"  found {n_found}/{len(photo_rows)} photos")
+
+    pdf_path = out_dir / f"{pin_slug}-appeal-narrative.pdf"
+    build_narrative_pdf(pdf_path, pin_dash, narrative, photo_rows)
+
     print(f"\n{len(comparables)} comparable properties found within {SEARCH_RADIUS_MILES} mi "
           f"(same class {source['attributes']['BCLASS']}, township, neighborhood, construction).")
     print(f"{len(building_comps)} are cheaper per sq ft of building value than "
@@ -531,7 +642,8 @@ def main():
           f"  {out_dir / f'{pin_slug}-comparables-building.csv'}\n"
           f"  {out_dir / f'{pin_slug}-comparables-land.csv'}\n"
           f"  {narrative_path}\n"
-          f"  {form_answers_path}")
+          f"  {form_answers_path}\n"
+          f"  {pdf_path}")
     print(f"\n{form_answers}")
     print(f"\n{narrative}")
 

@@ -11,7 +11,8 @@ python3 comps.py 16-07-204-019-0000
 python3 comps.py 16072040190000 --out-dir output/custom-run
 ```
 
-Requires `requests` and `pandas` (`pip install requests pandas`).
+Requires `requests`, `pandas`, `reportlab`, and `Pillow`
+(`pip install requests pandas reportlab Pillow`).
 
 Give it a PIN (PIN10 or PIN14, with or without dashes) and it will:
 
@@ -40,9 +41,15 @@ Give it a PIN (PIN10 or PIN14, with or without dashes) and it will:
    "Reason(s) for Appeal" checkboxes to select and draft text for each
    required "Explain ..." box on the Appeal Application page, and which
    specific PINs to search for and add on the Comparables Select page.
+6. Builds a PDF of the narrative -- ready for the "Appeal Narrative"
+   attachment -- with a Cook County assessor field photo of your property
+   and each cited comp (same photos CookViewer links to as "Historical
+   Photo"), capped at the filer's own 6-comp limit and compressed to stay
+   well under its 10MB attachment size cap.
 
 Pass `--no-enrich` to skip the sales/appeal-history lookups (faster, but
-without the extra evidence).
+without the extra evidence). Pass `--no-photos` to skip fetching photos
+for the PDF (faster; the PDF is still built, just without images).
 
 The suggested Desired Market Value defaults to the *median* $/sqft of the
 strongest comps -- a defensible, hard-to-dismiss ask. Pass
@@ -68,6 +75,9 @@ with `--out-dir`). For PIN `16-07-204-019-0000` that's:
   County's online appeal filer: Desired Market Value, which Reason(s) for
   Appeal checkboxes to select, draft text for each "Explain ..." box, and
   which PINs to search for and add on the Comparables Select page
+- `16072040190000-appeal-narrative.pdf` -- the narrative as a PDF exhibit,
+  with a field photo of your property and each cited comp -- upload this
+  directly as the "Appeal Narrative" attachment
 
 `output/` contains real property data and is gitignored -- it's never
 committed to this repo.
