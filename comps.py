@@ -5,8 +5,8 @@ from the county's ArcGIS backend (the same API maps.cookcountyil.gov/cookviewer
 uses for its "Comparable Properties" search) -- no browser/CSV export needed.
 
 Usage:
-    python3 comps.py 17-01-234-567-0000
-    python3 comps.py 17012345670000 --out-dir output/custom-run
+    python3 comps.py 16-07-204-019-0000
+    python3 comps.py 16072040190000 --out-dir output/custom-run
 
 Writes results under output/<assessment year>/ by default.
 """

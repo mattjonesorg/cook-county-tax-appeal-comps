@@ -7,8 +7,8 @@ CookViewer required.
 ## Quick start
 
 ```
-python3 comps.py 17-01-234-567-0000
-python3 comps.py 17012345670000 --out-dir output/custom-run
+python3 comps.py 16-07-204-019-0000
+python3 comps.py 16072040190000 --out-dir output/custom-run
 ```
 
 Requires `requests` and `pandas` (`pip install requests pandas`).
@@ -43,14 +43,14 @@ without the extra evidence).
 
 By default, results are written to `output/<assessment year>/` (the year is
 read from the property's own assessment data, e.g. `output/2026/`; override
-with `--out-dir`). For PIN `17-01-234-567-0000` that's:
+with `--out-dir`). For PIN `16-07-204-019-0000` that's:
 
-- `17012345670000-my-property.csv` -- your property's own data
-- `17012345670000-comparables-all.csv` -- every comp found, before filtering
-- `17012345670000-comparables-building.csv` -- comps cheaper per sqft of
+- `16072040190000-my-property.csv` -- your property's own data
+- `16072040190000-comparables-all.csv` -- every comp found, before filtering
+- `16072040190000-comparables-building.csv` -- comps cheaper per sqft of
   building value than yours, sorted strongest-evidence-first
-- `17012345670000-comparables-land.csv` -- same, for land value per sqft
-- `17012345670000-appeal-notes.txt` -- narrative summary explaining why each
+- `16072040190000-comparables-land.csv` -- same, for land value per sqft
+- `16072040190000-appeal-notes.txt` -- narrative summary explaining why each
   comp is comparable (class, construction, size/age deltas) and what
   evidence backs it, ready to paste into an appeal filing
 
