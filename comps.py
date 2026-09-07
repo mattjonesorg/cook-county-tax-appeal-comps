@@ -423,10 +423,13 @@ def build_comparables_tab_guidance(building_comps: pd.DataFrame, top_n: int = 5)
         "",
         "The county's own default search criteria here (neighborhood, class, "
         "year built range, living area range) already match this tool's filters "
-        "-- click \"Find Comparables\" as-is. Note there's no default distance/"
-        "radius filter on this tab (unlike CookViewer's map search); this "
-        "tool's 0.5 mi limit is an extra constraint on top, so its comp list "
-        "can be a subset of what shows up here.",
+        "-- click \"Find Comparables\" as-is. This tab's standard criteria don't "
+        "include a distance limit by default, but distance still matters for a "
+        "credible case (the Board of Review's own guidance favors comps on your "
+        "block or within a block or two): either add a Distance (ft.) value under "
+        "\"Custom / Additional Search Criteria\" (this tool's default is 0.5 mi "
+        "= 2,640 ft), or just select from the ranked list below, which is already "
+        "distance-filtered.",
         "",
         "In the Search Results grid, check the box for each PIN below (already "
         "in priority order) and click \"Add Selected Parcel(s)\". 3-5 total is "
