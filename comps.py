@@ -65,6 +65,12 @@ SQFT_TOLERANCE = 0.10
 AGE_TOLERANCE_YEARS = 15
 SEARCH_RADIUS_MILES = 0.5
 
+# Percentile of the strongest comps' $/sqft used for the suggested Desired
+# Market Value. 50 (median) is the most defensible, hardest-to-dismiss ask;
+# 25 leans further toward the cheapest comps for a less generous starting
+# ask, at the cost of relying on fewer/more extreme comps.
+DEFAULT_TARGET_PERCENTILE = 25
+
 
 def assessment_year(current_value_desc) -> str:
     """Pull the tax year out of e.g. '2026 Assessor Valuation'; falls back to
@@ -374,7 +380,7 @@ def cite_comps(df: pd.DataFrame, value_col: str, n: int = 3) -> str:
 
 def suggest_target_values(my_property: pd.Series, building_comps: pd.DataFrame,
                            land_comps: pd.DataFrame, top_n: int = 5,
-                           percentile: float = 50) -> dict:
+                           percentile: float = DEFAULT_TARGET_PERCENTILE) -> dict:
     """A defensible starting point for the form's 'Desired Market Value' field:
     a percentile of the strongest comps' $/sqft (50 = median; lower means a
     more aggressive ask, at the cost of leaning on fewer/more extreme comps),
@@ -422,7 +428,7 @@ assert len(OVERVALUATION_EXPLANATION) <= FORM_TEXT_FIELD_MAX_CHARS
 
 def build_form_answers(my_property: pd.Series, building_comps: pd.DataFrame,
                         land_comps: pd.DataFrame, top_n: int = 5,
-                        percentile: float = 50) -> str:
+                        percentile: float = DEFAULT_TARGET_PERCENTILE) -> str:
     """Field-by-field answers for Cook County's online 'Appeal Application'
     page (the one with Fair/Desired Market Value, Reason(s) for Appeal
     checkboxes, and an 'Explain ...' box for each checked reason)."""
@@ -554,11 +560,13 @@ def main():
                          help="Output folder (default: output/<assessment year>)")
     parser.add_argument("--no-enrich", action="store_true",
                          help="Skip the Parcel Sales / Board of Review lookups (faster, less evidence)")
-    parser.add_argument("--target-percentile", type=float, default=50,
-                         help="Percentile (0-100) of the strongest comps' $/sqft to use for "
-                              "the suggested Desired Market Value. 50 = median (default, most "
-                              "defensible); lower is a more aggressive ask but leans on fewer, "
-                              "more extreme comps; 0 = the single lowest comp.")
+    parser.add_argument("--target-percentile", type=float, default=DEFAULT_TARGET_PERCENTILE,
+                         help=f"Percentile (0-100) of the strongest comps' $/sqft to use for "
+                              f"the suggested Desired Market Value. Default is "
+                              f"{DEFAULT_TARGET_PERCENTILE} (below-median -- a less generous "
+                              "starting ask than the median); higher is more conservative, "
+                              "lower is more aggressive but leans on fewer/more extreme comps; "
+                              "50 = median, 0 = the single lowest comp.")
     parser.add_argument("--no-photos", action="store_true",
                          help="Skip fetching Cook County assessor field photos for the narrative "
                               "PDF (faster; the PDF still gets built, just text-only)")

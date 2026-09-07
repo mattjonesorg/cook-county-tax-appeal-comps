@@ -51,11 +51,13 @@ Pass `--no-enrich` to skip the sales/appeal-history lookups (faster, but
 without the extra evidence). Pass `--no-photos` to skip fetching photos
 for the PDF (faster; the PDF is still built, just without images).
 
-The suggested Desired Market Value defaults to the *median* $/sqft of the
-strongest comps -- a defensible, hard-to-dismiss ask. Pass
-`--target-percentile` (0-100) to move it: lower values push toward the
-cheapest comps for a more aggressive ask, at the cost of leaning on fewer,
-more extreme comps (`--target-percentile 0` uses the single lowest comp).
+The suggested Desired Market Value defaults to the *25th percentile* $/sqft
+of the strongest comps -- below the median, since a plain median ask tends
+to be too generous a starting point. Pass `--target-percentile` (0-100) to
+move it: 50 = median (more conservative, hardest to dismiss); lower than 25
+pushes further toward the cheapest comps for a more aggressive ask, at the
+cost of leaning on fewer, more extreme comps (`--target-percentile 0` uses
+the single lowest comp).
 
 ### Output
 
