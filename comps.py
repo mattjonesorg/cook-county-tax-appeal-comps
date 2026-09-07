@@ -482,8 +482,9 @@ def build_form_answers(my_property: pd.Series, building_comps: pd.DataFrame,
         cites = cite_comps(land_comps, "land_value_per_square_foot")
     lines.append(
         "The county's explain boxes are too short for specifics -- put the actual "
-        "evidence in the Comparables tab and/or as an attached PDF/CSV instead. For "
-        f"reference, the strongest comps are: {cites}."
+        "evidence in the Comparables tab and the Attachments tab instead "
+        "(-appeal-narrative.pdf for the narrative, -comparable-pins.txt for the "
+        f"required 'Comparable Property PIN(s)' upload). Strongest comps: {cites}."
     )
     lines.append("")
 
@@ -497,6 +498,21 @@ def build_form_answers(my_property: pd.Series, building_comps: pd.DataFrame,
     )
     lines.append("")
     lines.append(build_comparables_tab_guidance(building_comps, top_n))
+    return "\n".join(lines)
+
+
+def build_comparable_pins_list(pin_dash: str, building_comps: pd.DataFrame) -> str:
+    """The 'Comparable Property PIN(s)' attachment: the county asks for
+    exactly this -- 'a list of up to 6 PINs for properties claimed to be
+    comparable to the subject property' -- as its own document, separate
+    from the narrative PDF and the -comparables-building.csv (which isn't
+    capped at 6 and carries every column, not just PIN/address)."""
+    lines = [f"Comparable Property PINs -- Subject PIN {pin_dash}", ""]
+    if building_comps.empty:
+        lines.append("(No qualifying comparables -- see appeal-notes.txt.)")
+        return "\n".join(lines)
+    for i, (_, row) in enumerate(building_comps.head(MAX_COMPARABLE_PINS).iterrows(), start=1):
+        lines.append(f"{i}. {row['PIN14_dash']}  {row['street_address']}, {row['city_state_zip']}")
     return "\n".join(lines)
 
 
@@ -611,6 +627,10 @@ def main():
     form_answers_path = out_dir / f"{pin_slug}-appeal-form-answers.txt"
     form_answers_path.write_text(form_answers + "\n")
 
+    pins_list = build_comparable_pins_list(pin_dash, building_comps)
+    pins_list_path = out_dir / f"{pin_slug}-comparable-pins.txt"
+    pins_list_path.write_text(pins_list + "\n")
+
     photo_rows = []
     if not args.no_photos:
         print("Fetching property photos for the narrative PDF...")
@@ -643,6 +663,7 @@ def main():
           f"  {out_dir / f'{pin_slug}-comparables-land.csv'}\n"
           f"  {narrative_path}\n"
           f"  {form_answers_path}\n"
+          f"  {pins_list_path}\n"
           f"  {pdf_path}")
     print(f"\n{form_answers}")
     print(f"\n{narrative}")

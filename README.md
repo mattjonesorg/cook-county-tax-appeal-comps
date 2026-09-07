@@ -78,6 +78,9 @@ with `--out-dir`). For PIN `16-07-204-019-0000` that's:
 - `16072040190000-appeal-narrative.pdf` -- the narrative as a PDF exhibit,
   with a field photo of your property and each cited comp -- upload this
   directly as the "Appeal Narrative" attachment
+- `16072040190000-comparable-pins.txt` -- just the PIN, address, and city/
+  zip for the top (up to 6) comps -- upload this as the required
+  "Comparable Property PIN(s)" attachment
 
 `output/` contains real property data and is gitignored -- it's never
 committed to this repo.
