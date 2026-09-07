@@ -318,6 +318,18 @@ def has_sale_evidence(comps: pd.DataFrame) -> bool:
     return bool(((comps["CURRENTVALUE_TOTAL"] > implied_assessed) & comps["last_sale_price"].notna()).any())
 
 
+# Cook County's own online filer truncates the "Explain '<reason>'" boxes
+# after 40 characters (confirmed by pasting a longer explanation and seeing
+# it cut off mid-word) -- nowhere near enough room to cite specific PINs, so
+# these stay short and generic. The actual PIN-level evidence belongs in the
+# Comparables tab and the attached CSVs, not this box.
+FORM_TEXT_FIELD_MAX_CHARS = 40
+UNIFORMITY_EXPLANATION = "Similar homes assessed lower per sqft"
+OVERVALUATION_EXPLANATION = "Comparable sale below assessed value"
+assert len(UNIFORMITY_EXPLANATION) <= FORM_TEXT_FIELD_MAX_CHARS
+assert len(OVERVALUATION_EXPLANATION) <= FORM_TEXT_FIELD_MAX_CHARS
+
+
 def build_form_answers(my_property: pd.Series, building_comps: pd.DataFrame,
                         land_comps: pd.DataFrame, top_n: int = 5) -> str:
     """Field-by-field answers for Cook County's online 'Appeal Application'
@@ -356,28 +368,30 @@ def build_form_answers(my_property: pd.Series, building_comps: pd.DataFrame,
         "",
     ]
 
+    lines.append(
+        f"Explain 'Lack of Uniformity/Comparables' (max {FORM_TEXT_FIELD_MAX_CHARS} chars, "
+        "paste exactly):"
+    )
+    lines.append(f'  "{UNIFORMITY_EXPLANATION}"')
+    lines.append("")
+
+    if sale_evidence:
+        lines.append(
+            f"Explain 'Overvaluation' (max {FORM_TEXT_FIELD_MAX_CHARS} chars, paste exactly):"
+        )
+        lines.append(f'  "{OVERVALUATION_EXPLANATION}"')
+        lines.append("")
+
     if not building_comps.empty:
         cites = cite_comps(building_comps, "building_value_per_square_foot")
     else:
         cites = cite_comps(land_comps, "land_value_per_square_foot")
-    lines.append("Explain 'Lack of Uniformity/Comparables':")
     lines.append(
-        f'  "My property is assessed at ${my_property["building_value_per_square_foot"]:.2f}/sqft '
-        f"of building value, but {len(building_comps)} properties within "
-        f"{SEARCH_RADIUS_MILES} mi -- same class {my_property['BCLASS']}, same construction "
-        f"type, similar age and size -- are assessed lower, e.g. {cites}. Full list attached.\""
+        "The county's explain boxes are too short for specifics -- put the actual "
+        "evidence in the Comparables tab and/or as an attached PDF/CSV instead. For "
+        f"reference, the strongest comps are: {cites}."
     )
     lines.append("")
-
-    if sale_evidence:
-        lines.append("Explain 'Overvaluation':")
-        lines.append(
-            f'  "The county\'s Fair Market Value of ${values["current_market_value"]:,.0f} '
-            "exceeds this property's true market value based on the comparable assessments "
-            "above and at least one comparable property's recent sale price; the evidence "
-            f'supports a market value closer to ${values["desired_market_value"]:,.0f}."'
-        )
-        lines.append("")
 
     lines.append(
         f"How is the Subject Property used?: Single Family (property class "
