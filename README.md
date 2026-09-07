@@ -43,6 +43,12 @@ Give it a PIN (PIN10 or PIN14, with or without dashes) and it will:
 Pass `--no-enrich` to skip the sales/appeal-history lookups (faster, but
 without the extra evidence).
 
+The suggested Desired Market Value defaults to the *median* $/sqft of the
+strongest comps -- a defensible, hard-to-dismiss ask. Pass
+`--target-percentile` (0-100) to move it: lower values push toward the
+cheapest comps for a more aggressive ask, at the cost of leaning on fewer,
+more extreme comps (`--target-percentile 0` uses the single lowest comp).
+
 ### Output
 
 By default, results are written to `output/<assessment year>/` (the year is

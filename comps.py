@@ -287,17 +287,21 @@ def cite_comps(df: pd.DataFrame, value_col: str, n: int = 3) -> str:
 
 
 def suggest_target_values(my_property: pd.Series, building_comps: pd.DataFrame,
-                           land_comps: pd.DataFrame, top_n: int = 5) -> dict:
+                           land_comps: pd.DataFrame, top_n: int = 5,
+                           percentile: float = 50) -> dict:
     """A defensible starting point for the form's 'Desired Market Value' field:
-    the median $/sqft of the strongest comps, applied to this property's own
-    square footage, scaled back up to market value."""
+    a percentile of the strongest comps' $/sqft (50 = median; lower means a
+    more aggressive ask, at the cost of leaning on fewer/more extreme comps),
+    applied to this property's own square footage, scaled back up to market
+    value."""
+    quantile = percentile / 100
     if not building_comps.empty:
-        target_building_psf = building_comps.head(top_n)["building_value_per_square_foot"].median()
+        target_building_psf = building_comps.head(top_n)["building_value_per_square_foot"].quantile(quantile)
         target_building_value = target_building_psf * my_property["BLDGSQFT"]
     else:
         target_building_value = my_property["CURRENTVALUE_BLDG"]
     if not land_comps.empty:
-        target_land_psf = land_comps.head(top_n)["land_value_per_square_foot"].median()
+        target_land_psf = land_comps.head(top_n)["land_value_per_square_foot"].quantile(quantile)
         target_land_value = target_land_psf * my_property["LANDSF"]
     else:
         target_land_value = my_property["CURRENTVALUE_LAND"]
@@ -331,7 +335,8 @@ assert len(OVERVALUATION_EXPLANATION) <= FORM_TEXT_FIELD_MAX_CHARS
 
 
 def build_form_answers(my_property: pd.Series, building_comps: pd.DataFrame,
-                        land_comps: pd.DataFrame, top_n: int = 5) -> str:
+                        land_comps: pd.DataFrame, top_n: int = 5,
+                        percentile: float = 50) -> str:
     """Field-by-field answers for Cook County's online 'Appeal Application'
     page (the one with Fair/Desired Market Value, Reason(s) for Appeal
     checkboxes, and an 'Explain ...' box for each checked reason)."""
@@ -344,8 +349,9 @@ def build_form_answers(my_property: pd.Series, building_comps: pd.DataFrame,
             "appeal cycle."
         )
 
-    values = suggest_target_values(my_property, building_comps, land_comps, top_n)
+    values = suggest_target_values(my_property, building_comps, land_comps, top_n, percentile)
     sale_evidence = has_sale_evidence(building_comps) or has_sale_evidence(land_comps)
+    percentile_label = "median" if percentile == 50 else f"{percentile:g}th percentile"
 
     lines = [
         "=== Cook County online Appeal Application: suggested answers ===",
@@ -354,13 +360,15 @@ def build_form_answers(my_property: pd.Series, building_comps: pd.DataFrame,
         "",
         f"Desired Market Value: ${values['desired_market_value']:,.0f}",
         (
-            f"  (median $/sqft of the {min(top_n, len(building_comps))} strongest building "
-            f"comps and {min(top_n, len(land_comps))} strongest land comps below, applied to "
-            f"this property's own {my_property['BLDGSQFT']:,.0f} sqft building / "
+            f"  ({percentile_label} $/sqft of the {min(top_n, len(building_comps))} strongest "
+            f"building comps and {min(top_n, len(land_comps))} strongest land comps below, "
+            f"applied to this property's own {my_property['BLDGSQFT']:,.0f} sqft building / "
             f"{my_property['LANDSF']:,.0f} sqft lot, then scaled to market value at Cook "
             f"County's {RESIDENTIAL_ASSESSMENT_LEVEL:.0%} residential assessment level. "
             "This is a defensible starting point, not a legal requirement -- round it to "
-            "a number you're comfortable arguing for.)"
+            "a number you're comfortable arguing for. Lower percentiles push closer to "
+            "the cheapest comps: a more aggressive ask, but easier to dismiss if that "
+            "comp is an outlier. --target-percentile controls this.)"
         ),
         "",
         "Reason(s) for Appeal: check \"Lack of Uniformity/Comparables\""
@@ -411,7 +419,14 @@ def main():
                          help="Output folder (default: output/<assessment year>)")
     parser.add_argument("--no-enrich", action="store_true",
                          help="Skip the Parcel Sales / Board of Review lookups (faster, less evidence)")
+    parser.add_argument("--target-percentile", type=float, default=50,
+                         help="Percentile (0-100) of the strongest comps' $/sqft to use for "
+                              "the suggested Desired Market Value. 50 = median (default, most "
+                              "defensible); lower is a more aggressive ask but leans on fewer, "
+                              "more extreme comps; 0 = the single lowest comp.")
     args = parser.parse_args()
+    if not 0 <= args.target_percentile <= 100:
+        parser.error("--target-percentile must be between 0 and 100")
 
     pin_dash = normalize_pin(args.pin)
     print(f"Looking up {pin_dash}...")
@@ -469,7 +484,8 @@ def main():
     narrative_path = out_dir / f"{pin_slug}-appeal-notes.txt"
     narrative_path.write_text(narrative + "\n")
 
-    form_answers = build_form_answers(my_property.iloc[0], building_comps, land_comps)
+    form_answers = build_form_answers(my_property.iloc[0], building_comps, land_comps,
+                                       percentile=args.target_percentile)
     form_answers_path = out_dir / f"{pin_slug}-appeal-form-answers.txt"
     form_answers_path.write_text(form_answers + "\n")
 
