@@ -409,6 +409,36 @@ def build_form_answers(my_property: pd.Series, building_comps: pd.DataFrame,
         "Field Check Request: No, unless you're disputing your own property's "
         "characteristics (sqft/age/condition) rather than its value"
     )
+    lines.append("")
+    lines.append(build_comparables_tab_guidance(building_comps, top_n))
+    return "\n".join(lines)
+
+
+def build_comparables_tab_guidance(building_comps: pd.DataFrame, top_n: int = 5) -> str:
+    """Guidance for the 'Comparables Select' / 'Comparables' tabs, which come
+    after the Appeal Application page and only appear if 'Lack of
+    Uniformity/Comparables' was checked there."""
+    lines = [
+        "=== Comparables Select tab ===",
+        "",
+        "The county's own default search criteria here (neighborhood, class, "
+        "year built range, living area range) already match this tool's filters "
+        "-- click \"Find Comparables\" as-is. Note there's no default distance/"
+        "radius filter on this tab (unlike CookViewer's map search); this "
+        "tool's 0.5 mi limit is an extra constraint on top, so its comp list "
+        "can be a subset of what shows up here.",
+        "",
+        "In the Search Results grid, check the box for each PIN below (already "
+        "in priority order) and click \"Add Selected Parcel(s)\". 3-5 total is "
+        "plenty -- adding every match doesn't strengthen the case:",
+        "",
+    ]
+    if building_comps.empty:
+        lines.append("(No comps to suggest -- see the note above.)")
+        return "\n".join(lines)
+    for i, (_, row) in enumerate(building_comps.head(top_n).iterrows(), start=1):
+        tag = " -- reduced on appeal" if row.get("ever_reduced_at_bor") is True else ""
+        lines.append(f"{i}. {row['PIN14_dash']} ({row['street_address']}){tag}")
     return "\n".join(lines)
 
 
