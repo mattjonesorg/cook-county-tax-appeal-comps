@@ -278,6 +278,118 @@ def build_narrative(my_property: pd.Series, cheaper_comps: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
+def cite_comps(df: pd.DataFrame, value_col: str, n: int = 3) -> str:
+    cites = [
+        f"{row['PIN14_dash']} ({row['street_address']}, ${row[value_col]:.2f}/sqft)"
+        for _, row in df.head(n).iterrows()
+    ]
+    return "; ".join(cites)
+
+
+def suggest_target_values(my_property: pd.Series, building_comps: pd.DataFrame,
+                           land_comps: pd.DataFrame, top_n: int = 5) -> dict:
+    """A defensible starting point for the form's 'Desired Market Value' field:
+    the median $/sqft of the strongest comps, applied to this property's own
+    square footage, scaled back up to market value."""
+    if not building_comps.empty:
+        target_building_psf = building_comps.head(top_n)["building_value_per_square_foot"].median()
+        target_building_value = target_building_psf * my_property["BLDGSQFT"]
+    else:
+        target_building_value = my_property["CURRENTVALUE_BLDG"]
+    if not land_comps.empty:
+        target_land_psf = land_comps.head(top_n)["land_value_per_square_foot"].median()
+        target_land_value = target_land_psf * my_property["LANDSF"]
+    else:
+        target_land_value = my_property["CURRENTVALUE_LAND"]
+    target_assessed_total = target_building_value + target_land_value
+    return {
+        "target_building_value": target_building_value,
+        "target_land_value": target_land_value,
+        "target_assessed_total": target_assessed_total,
+        "desired_market_value": target_assessed_total / RESIDENTIAL_ASSESSMENT_LEVEL,
+        "current_market_value": my_property["CURRENTVALUE_TOTAL"] / RESIDENTIAL_ASSESSMENT_LEVEL,
+    }
+
+
+def has_sale_evidence(comps: pd.DataFrame) -> bool:
+    if comps.empty or "last_sale_price" not in comps.columns:
+        return False
+    implied_assessed = comps["last_sale_price"] * RESIDENTIAL_ASSESSMENT_LEVEL
+    return bool(((comps["CURRENTVALUE_TOTAL"] > implied_assessed) & comps["last_sale_price"].notna()).any())
+
+
+def build_form_answers(my_property: pd.Series, building_comps: pd.DataFrame,
+                        land_comps: pd.DataFrame, top_n: int = 5) -> str:
+    """Field-by-field answers for Cook County's online 'Appeal Application'
+    page (the one with Fair/Desired Market Value, Reason(s) for Appeal
+    checkboxes, and an 'Explain ...' box for each checked reason)."""
+    if building_comps.empty and land_comps.empty:
+        return (
+            "No comparable properties came back cheaper than this one on either "
+            "building or land value per square foot -- there's no uniformity case "
+            "to make from this data alone this year. Consider widening the search "
+            "(a larger radius or age/sqft tolerance) before filing, or skip this "
+            "appeal cycle."
+        )
+
+    values = suggest_target_values(my_property, building_comps, land_comps, top_n)
+    sale_evidence = has_sale_evidence(building_comps) or has_sale_evidence(land_comps)
+
+    lines = [
+        "=== Cook County online Appeal Application: suggested answers ===",
+        "",
+        f"Fair Market Value (shown by the county, read-only): ${values['current_market_value']:,.0f}",
+        "",
+        f"Desired Market Value: ${values['desired_market_value']:,.0f}",
+        (
+            f"  (median $/sqft of the {min(top_n, len(building_comps))} strongest building "
+            f"comps and {min(top_n, len(land_comps))} strongest land comps below, applied to "
+            f"this property's own {my_property['BLDGSQFT']:,.0f} sqft building / "
+            f"{my_property['LANDSF']:,.0f} sqft lot, then scaled to market value at Cook "
+            f"County's {RESIDENTIAL_ASSESSMENT_LEVEL:.0%} residential assessment level. "
+            "This is a defensible starting point, not a legal requirement -- round it to "
+            "a number you're comfortable arguing for.)"
+        ),
+        "",
+        "Reason(s) for Appeal: check \"Lack of Uniformity/Comparables\""
+        + (" and \"Overvaluation\"" if sale_evidence else ""),
+        "",
+    ]
+
+    if not building_comps.empty:
+        cites = cite_comps(building_comps, "building_value_per_square_foot")
+    else:
+        cites = cite_comps(land_comps, "land_value_per_square_foot")
+    lines.append("Explain 'Lack of Uniformity/Comparables':")
+    lines.append(
+        f'  "My property is assessed at ${my_property["building_value_per_square_foot"]:.2f}/sqft '
+        f"of building value, but {len(building_comps)} properties within "
+        f"{SEARCH_RADIUS_MILES} mi -- same class {my_property['BCLASS']}, same construction "
+        f"type, similar age and size -- are assessed lower, e.g. {cites}. Full list attached.\""
+    )
+    lines.append("")
+
+    if sale_evidence:
+        lines.append("Explain 'Overvaluation':")
+        lines.append(
+            f'  "The county\'s Fair Market Value of ${values["current_market_value"]:,.0f} '
+            "exceeds this property's true market value based on the comparable assessments "
+            "above and at least one comparable property's recent sale price; the evidence "
+            f'supports a market value closer to ${values["desired_market_value"]:,.0f}."'
+        )
+        lines.append("")
+
+    lines.append(
+        f"How is the Subject Property used?: Single Family (property class "
+        f"{my_property['BCLASS']} is single-family residential)"
+    )
+    lines.append(
+        "Field Check Request: No, unless you're disputing your own property's "
+        "characteristics (sqft/age/condition) rather than its value"
+    )
+    return "\n".join(lines)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("pin", help="Property Index Number (PIN10/PIN14, with or without dashes)")
@@ -343,6 +455,10 @@ def main():
     narrative_path = out_dir / f"{pin_slug}-appeal-notes.txt"
     narrative_path.write_text(narrative + "\n")
 
+    form_answers = build_form_answers(my_property.iloc[0], building_comps, land_comps)
+    form_answers_path = out_dir / f"{pin_slug}-appeal-form-answers.txt"
+    form_answers_path.write_text(form_answers + "\n")
+
     print(f"\n{len(comparables)} comparable properties found within {SEARCH_RADIUS_MILES} mi "
           f"(same class {source['attributes']['BCLASS']}, township, neighborhood, construction).")
     print(f"{len(building_comps)} are cheaper per sq ft of building value than "
@@ -351,7 +467,9 @@ def main():
           f"  {out_dir / f'{pin_slug}-comparables-all.csv'}\n"
           f"  {out_dir / f'{pin_slug}-comparables-building.csv'}\n"
           f"  {out_dir / f'{pin_slug}-comparables-land.csv'}\n"
-          f"  {narrative_path}")
+          f"  {narrative_path}\n"
+          f"  {form_answers_path}")
+    print(f"\n{form_answers}")
     print(f"\n{narrative}")
 
 

@@ -34,7 +34,11 @@ Give it a PIN (PIN10 or PIN14, with or without dashes) and it will:
      property's last appeal outcome for context.
 4. Filters to comps assessed *lower* per square foot than your property,
    ranks the strongest evidence first, and writes CSVs plus a ready-to-use
-   narrative for the appeal form.
+   narrative.
+5. Suggests field-by-field answers for Cook County's own online "Appeal
+   Application" page -- a Desired Market Value derived from the strongest
+   comps, which "Reason(s) for Appeal" checkboxes to select, and draft text
+   for each required "Explain ..." box.
 
 Pass `--no-enrich` to skip the sales/appeal-history lookups (faster, but
 without the extra evidence).
@@ -53,6 +57,10 @@ with `--out-dir`). For PIN `16-07-204-019-0000` that's:
 - `16072040190000-appeal-notes.txt` -- narrative summary explaining why each
   comp is comparable (class, construction, size/age deltas) and what
   evidence backs it, ready to paste into an appeal filing
+- `16072040190000-appeal-form-answers.txt` -- suggested answers for Cook
+  County's online Appeal Application page specifically: Desired Market
+  Value, which Reason(s) for Appeal checkboxes to select, and draft text
+  for each "Explain ..." box the form requires once a reason is checked
 
 `output/` contains real property data and is gitignored -- it's never
 committed to this repo.
